@@ -30,15 +30,9 @@ JDBC_OPTS = {
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JDBC_JAR_PATH = os.path.join(BASE_DIR, "postgresql-42.7.6.jar")
 
-@st.cache_resource
-def get_spark_session():
-    """
-    Cache the Spark session to avoid reinitializing it when switching pages.
-    """
-    return (SparkSession.builder
-            .appName("education_pathway")
-            .config("spark.jars", JDBC_JAR_PATH)
-            .getOrCreate())
+spark = SparkSession.builder.appName("ai_adoption_analysis")\
+            .config("spark.jars", JDBC_JAR_PATH)\
+            .getOrCreate()
 
 def fetch_data(spark, query):
     """
@@ -207,41 +201,26 @@ def bar_plot(df_pd, x_col, y_col, title, x_title, y_title):
     st.plotly_chart(fig)
 
 
-# # Function to group <1% categories into "Other"
-# def group_small_categories(df, label_col, value_col, threshold=1):
-#     # Calculate the total count
-#     total_count = df.select(sum(col(value_col))).collect()[0][0]
-#     # Add a percentage column
-#     df = df.withColumn("percentage", (col(value_col) / lit(total_count)) * 100)
-#     # Separate large and small categories
-#     large_categories = df.filter(col("percentage") >= threshold)
-#     small_categories = df.filter(col("percentage") < threshold)
-#     # Aggregate small categories into "Other"
-#     if small_categories.count() > 0:
-#         other_row = small_categories.groupBy().agg(
-#             lit("Other").alias(label_col),
-#             sum(col(value_col)).alias(value_col),
-#             sum(col("percentage")).alias("percentage")
-#         )
-#         # Combine large categories and "Other"
-#         df = large_categories.union(other_row)
-#     # Select only the label and value columns
-#     return df.select(label_col, value_col)
-
 # Function to group <1% categories into "Other"
-def group_small_categories(data, label_col, value_col, threshold=1):
-    total = data[value_col].sum()
-    data["percentage"] = (data[value_col] / total) * 100
-    large_categories = data[data["percentage"] >= threshold]
-    small_categories = data[data["percentage"] < threshold]
-    if not small_categories.empty:
-        other_row = pd.DataFrame({
-            label_col: ["Other"],
-            value_col: [small_categories[value_col].sum()],
-            "percentage": [small_categories["percentage"].sum()]
-        })
-        data = pd.concat([large_categories, other_row], ignore_index=True)
-    return data[[label_col, value_col]]
+def group_small_categories(df, label_col, value_col, threshold=1):
+    # Calculate the total count
+    total_count = df.select(sum(col(value_col))).collect()[0][0]
+    # Add a percentage column
+    df = df.withColumn("percentage", (col(value_col) / lit(total_count)) * 100)
+    # Separate large and small categories
+    large_categories = df.filter(col("percentage") >= threshold)
+    small_categories = df.filter(col("percentage") < threshold)
+    # Aggregate small categories into "Other"
+    if small_categories.count() > 0:
+        other_row = small_categories.groupBy().agg(
+            lit("Other").alias(label_col),
+            sum(col(value_col)).alias(value_col),
+            sum(col("percentage")).alias("percentage")
+        )
+        # Combine large categories and "Other"
+        df = large_categories.union(other_row)
+    # Select only the label and value columns
+    return df.select(label_col, value_col)
 
 def ai_trust_details_data(spark, ai_acc):
     ai_acc_escaped = ai_acc.replace("'", "''")
@@ -260,7 +239,7 @@ def ai_trust_details_data(spark, ai_acc):
     # Load data from the database
     df_devtype = fetch_data(spark, query_devtype)
     df_industry = fetch_data(spark, query_industry)
-    return df_devtype.toPandas(), df_industry.toPandas()
+    return df_devtype, df_industry
 
 def ai_threat_details_data(spark, ai_threat):
     ai_threat_escaped = ai_threat.replace("'", "''")
@@ -279,13 +258,13 @@ def ai_threat_details_data(spark, ai_threat):
     # Load data from the database
     df_devtype = fetch_data(spark, query_devtype)
     df_industry = fetch_data(spark, query_industry)
-    return df_devtype.toPandas(), df_industry.toPandas()
+    return df_devtype, df_industry
 
 @st.cache_data
-def data_caching(df_pd_devtype, df_pd_industry, arg):
-    devtype_data = group_small_categories(df_pd_devtype, "DevType", "count")
-    industry_data = group_small_categories(df_pd_industry, "Industry", "count")
-    return devtype_data, industry_data
+def data_caching(_df_devtype, _df_industry, arg):
+    devtype_data = group_small_categories(_df_devtype, "DevType", "count")
+    industry_data = group_small_categories(_df_industry, "Industry", "count")
+    return devtype_data.toPandas(), industry_data.toPandas()
 
 def pie_plot(df_pd_devtype, df_pd_industry, trust_or_threat, level):
     # Create side-by-side pie charts
@@ -323,75 +302,74 @@ def pie_plot(df_pd_devtype, df_pd_industry, trust_or_threat, level):
     st.plotly_chart(fig)
 
 
-if __name__ == "__main__":
-    st.set_page_config(page_title="AI Adoption Analysis", page_icon="📈", layout="wide")
-    st.markdown("# 📊 AI Adoption Analysis")
-    st.write(
-        """
-        This analysis explores the adoption and perception of AI across different industries and developer roles. 
-        It provides insights into how developers are using AI tools, their trust levels in AI, and their views on AI as a potential threat.
 
-        ### Key Highlights:
-        - **AI Use by Industry:** A breakdown of AI adoption across various industries, showing the percentage of respondents who currently use AI, plan to use it, or do not intend to use it.
-        - **AI Use by Developer Type:** An analysis of AI adoption among different developer roles, highlighting how AI usage varies by profession.
-        - **AI Trust Levels:** A distribution of trust levels in AI, ranging from "Highly trust" to "Highly distrust," providing insights into developers' confidence in AI technologies.
-        - **AI Threat Levels:** An exploration of how developers perceive AI as a potential threat, categorized into different levels of concern.
+st.set_page_config(page_title="AI Adoption Analysis", page_icon="📈", layout="wide")
+st.markdown("# 📊 AI Adoption Analysis")
+st.write(
+    """
+    This analysis explores the adoption and perception of AI across different industries and developer roles. 
+    It provides insights into how developers are using AI tools, their trust levels in AI, and their views on AI as a potential threat.
 
-        These visualizations aim to provide a comprehensive understanding of the current state of AI adoption and attitudes toward AI in the developer community.
-        """
-    )
+    ### Key Highlights:
+    - **AI Use by Industry:** A breakdown of AI adoption across various industries, showing the percentage of respondents who currently use AI, plan to use it, or do not intend to use it.
+    - **AI Use by Developer Type:** An analysis of AI adoption among different developer roles, highlighting how AI usage varies by profession.
+    - **AI Trust Levels:** A distribution of trust levels in AI, ranging from "Highly trust" to "Highly distrust," providing insights into developers' confidence in AI technologies.
+    - **AI Threat Levels:** An exploration of how developers perceive AI as a potential threat, categorized into different levels of concern.
 
-    # Create Spark session
-    spark = get_spark_session()
+    These visualizations aim to provide a comprehensive understanding of the current state of AI adoption and attitudes toward AI in the developer community.
+    """
+)
 
-    # Section: AI Use by Industry
-    st.markdown("## 🏭 AI Use by Industry")
-    st.write("Explore how AI adoption varies across different industries.")
-    df_pd_industry = ai_use_by_industry_data(spark)
-    stacked_bar_plot(df_pd_industry, "Industry", "AI Adoption by Industry", "Industry", "Percentage (%)", "AI Use")
- 
-    # Section: AI Use by Developer Type
-    st.markdown("## 👩‍💻 AI Use by Developer Type")
-    st.write("Analyze how AI adoption differs among various developer roles.")
-    df_pd_devtype = ai_use_by_devtype_data(spark)
-    stacked_bar_plot(df_pd_devtype, "DevType", "AI Adoption by Developer Type", "Developer Type", "Percentage (%)", "AI Use")
+# Section: AI Use by Industry
+st.markdown("## 🏭 AI Use by Industry")
+st.write("Explore how AI adoption varies across different industries.")
+df_pd_industry = ai_use_by_industry_data(spark)
+stacked_bar_plot(df_pd_industry, "Industry", "AI Adoption by Industry", "Industry", "Percentage (%)", "AI Use")
 
-    # Section: AI Trust Levels
-    st.markdown("## 🤝 AI Trust Levels")
-    st.write("Understand developers' trust levels in AI technologies.")
-    ai_trust_df = ai_trust_data(spark)
-    bar_plot(ai_trust_df, "AIAcc", "count",
-              title="AI Trust Levels Distribution",
-              x_title="AI Trust Levels",
-              y_title="Number of Respondents")  
+# Section: AI Use by Developer Type
+st.markdown("## 👩‍💻 AI Use by Developer Type")
+st.write("Analyze how AI adoption differs among various developer roles.")
+df_pd_devtype = ai_use_by_devtype_data(spark)
+stacked_bar_plot(df_pd_devtype, "DevType", "AI Adoption by Developer Type", "Developer Type", "Percentage (%)", "AI Use")
 
-    # Detailed Analysis: AI Trust Levels
-    st.markdown("### 🔍 Detailed Analysis: AI Trust Levels")
-    st.write("Select an AI trust level to view a detailed breakdown by developer type and industry.")
-    aiacc = st.selectbox(
-        "Select AI Trust Level:",
-        ["Highly trust", "Somewhat trust", "Neither trust nor distrust", "Somewhat distrust", "Highly distrust"]
-    )
-    trust_by_devtype_df, trust_by_industry_df = ai_trust_details_data(spark, aiacc)
-    trust_by_devtype_df_pd, trust_by_industry_df_pd = data_caching(trust_by_devtype_df, trust_by_industry_df, aiacc)
-    pie_plot(trust_by_devtype_df_pd, trust_by_industry_df_pd, "Trust", aiacc)
+# Section: AI Trust Levels
+st.markdown("## 🤝 AI Trust Levels")
+st.write("Understand developers' trust levels in AI technologies.")
+ai_trust_df = ai_trust_data(spark)
+bar_plot(ai_trust_df, "AIAcc", "count",
+          title="AI Trust Levels Distribution",
+          x_title="AI Trust Levels",
+          y_title="Number of Respondents")  
 
-    # Section: AI Threat Levels
-    st.markdown("## ⚠️ AI Threat Levels")
-    st.write("Explore how developers perceive AI as a potential threat.")
-    ai_threat_df = ai_threat_data(spark)
-    bar_plot(ai_threat_df, "AIThreat", "count",
-             title="AI Threat Levels Distribution",
-             x_title="AI Threat Levels",
-             y_title="Number of Respondents")    
+# Detailed Analysis: AI Trust Levels
+st.markdown("### 🔍 Detailed Analysis: AI Trust Levels")
+st.write("Select an AI trust level to view a detailed breakdown by developer type and industry.")
+aiacc = st.selectbox(
+    "Select AI Trust Level:",
+    ["Highly trust", "Somewhat trust", "Neither trust nor distrust", "Somewhat distrust", "Highly distrust"]
+)
+trust_by_devtype_df, trust_by_industry_df = ai_trust_details_data(spark, aiacc)
+trust_by_devtype_df_pd, trust_by_industry_df_pd = data_caching(trust_by_devtype_df, trust_by_industry_df, aiacc)
+pie_plot(trust_by_devtype_df_pd, trust_by_industry_df_pd, "Trust", aiacc)
 
-    # Detailed Analysis: AI Threat Levels
-    st.markdown("### 🔍 Detailed Analysis: AI Threat Levels")
-    st.write("Select an AI threat level to view a detailed breakdown by developer type and industry.")
-    aithreat = st.selectbox(
-        "Select AI Threat Level:",
-        ["Yes", "No", "I'm not sure"]
-    )
-    threat_by_devtype_df, threat_by_industry_df = ai_threat_details_data(spark, aithreat)
-    threat_by_devtype_df_pd, threat_by_industry_df_pd = data_caching(threat_by_devtype_df, threat_by_industry_df, aithreat)
-    pie_plot(threat_by_devtype_df_pd, threat_by_industry_df_pd, "Threat", aithreat)
+# Section: AI Threat Levels
+st.markdown("## ⚠️ AI Threat Levels")
+st.write("Explore how developers perceive AI as a potential threat.")
+ai_threat_df = ai_threat_data(spark)
+bar_plot(ai_threat_df, "AIThreat", "count",
+         title="AI Threat Levels Distribution",
+         x_title="AI Threat Levels",
+         y_title="Number of Respondents")    
+
+# Detailed Analysis: AI Threat Levels
+st.markdown("### 🔍 Detailed Analysis: AI Threat Levels")
+st.write("Select an AI threat level to view a detailed breakdown by developer type and industry.")
+aithreat = st.selectbox(
+    "Select AI Threat Level:",
+    ["Yes", "No", "I'm not sure"]
+)
+threat_by_devtype_df, threat_by_industry_df = ai_threat_details_data(spark, aithreat)
+threat_by_devtype_df_pd, threat_by_industry_df_pd = data_caching(threat_by_devtype_df, threat_by_industry_df, aithreat)
+pie_plot(threat_by_devtype_df_pd, threat_by_industry_df_pd, "Threat", aithreat)
+
+spark.stop()  # Stop the Spark session when done

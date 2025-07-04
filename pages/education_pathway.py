@@ -35,15 +35,10 @@ JDBC_OPTS = {
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JDBC_JAR_PATH = os.path.join(BASE_DIR, "postgresql-42.7.6.jar")
 
-@st.cache_resource
-def get_spark_session():
-    """
-    Cache the Spark session to avoid reinitializing it when switching pages.
-    """
-    return (SparkSession.builder
-            .appName("education_pathway")
-            .config("spark.jars", JDBC_JAR_PATH)
-            .getOrCreate())
+spark = SparkSession.builder \
+            .appName("education_pathway_analysis") \
+            .config("spark.jars", JDBC_JAR_PATH) \
+            .getOrCreate()
 
 def fetch_data(spark, query):
     """
@@ -286,83 +281,81 @@ def pca_plot(df_pd):
     st.plotly_chart(fig)
 
 
-if __name__ == "__main__":
-    # Streamlit page configuration
-    st.set_page_config(page_title="Education Pathway Analysis", page_icon="📚", layout="wide")
 
-    # Page title and description
-    st.title("📚 Education Pathway Analysis")
-    st.markdown(
-        """
-        This page explores the relationships between education pathways, learning methods, and career outcomes 
-        using data from the Stack Overflow Developer Survey. Key analyses include:
-        - **Sankey Diagrams**: Visualize the flow from education levels to learning methods and career outcomes.
-        - **Association Analysis**: Identify the strongest relationships between education, industries, and developer roles.
-        - **Clustering and PCA**: Group respondents based on their education and learning methods, and visualize clusters using PCA.
-        """
-    )
+# Streamlit page configuration
+st.set_page_config(page_title="Education Pathway Analysis", page_icon="📚", layout="wide")
 
-    spark = get_spark_session()
+# Page title and description
+st.title("📚 Education Pathway Analysis")
+st.markdown(
+    """
+    This page explores the relationships between education pathways, learning methods, and career outcomes 
+    using data from the Stack Overflow Developer Survey. Key analyses include:
+    - **Sankey Diagrams**: Visualize the flow from education levels to learning methods and career outcomes.
+    - **Association Analysis**: Identify the strongest relationships between education, industries, and developer roles.
+    - **Clustering and PCA**: Group respondents based on their education and learning methods, and visualize clusters using PCA.
+    """
+)
 
-    st.subheader("🎓 Education Pathways to Career Outcomes")
-    st.markdown(
-        """
-        The Sankey diagrams below illustrate the flow from education levels to learning methods and career outcomes.
-        """
-    )
-    # Create and display the Sankey Diagrams
-    df_learn_code = fetch_learn_code_data(spark)
-    df_respondent = fetch_respondent(spark)
-    edlevel_to_learn, learn_to_devtype, learn_to_industry = data_to_pandas(df_learn_code, df_respondent)
-    create_sankey_plots(edlevel_to_learn, learn_to_devtype, learn_to_industry)
+st.subheader("🎓 Education Pathways to Career Outcomes")
+st.markdown(
+    """
+    The Sankey diagrams below illustrate the flow from education levels to learning methods and career outcomes.
+    """
+)
+# Create and display the Sankey Diagrams
+df_learn_code = fetch_learn_code_data(spark)
+df_respondent = fetch_respondent(spark)
+edlevel_to_learn, learn_to_devtype, learn_to_industry = data_to_pandas(df_learn_code, df_respondent)
+create_sankey_plots(edlevel_to_learn, learn_to_devtype, learn_to_industry)
 
-    learn_code_features = [
-        "Books or physical media", "Coding Bootcamp", "Colleague", "Friend or family member",
-        "On the job training", "Online Courses or Certification", "Other online resources", "School (University or College)"
-    ]
-    education_features = [
-        "Associate degree", "Bachelor degree", "Master degree", "Primary or elementary school", "Professional degree",
-        "Secondary school", "Some college or university study without earning a degree"
-    ]
-    industry_targets = [
-        "Banking/Financial Services", "Computer Systems Design and Services", "Energy", "Fintech", "Government", "Healthcare", 
-        "Higher Education", "Insurance", "Internet, Telecomm or Information Services", "Manufacturing", 
-        "Media & Advertising Services", "Retail and Consumer Services", "Software Development", "Transportation, or Supply Chain"
-    ]
-    dev_type_targets = [
-        "Academic researcher", "Blockchain", "Cloud infrastructure engineer", "Data engineer", "Data or business analyst", "Student", "System administrator",
-        "Data scientist or machine learning specialist", "Database administrator", "Designer", "DevOps specialist", "Developer Advocate", 
-        "Developer Experience", "Developer, AI", "Developer, QA or test", "Developer, back-end", "Developer, desktop or enterprise applications", 
-        "Developer, embedded applications or devices", "Developer, front-end", "Developer, full-stack", "Developer, game or graphics", 
-        "Developer, mobile", "Educator", "Engineer, site reliability", "Engineering manager", "Hardware Engineer", "Marketing or sales professional", 
-        "Product manager", "Project manager", "Research & Development role", "Scientist", "Security professional", "Senior Executive"
-    ]
+learn_code_features = [
+    "Books or physical media", "Coding Bootcamp", "Colleague", "Friend or family member",
+    "On the job training", "Online Courses or Certification", "Other online resources", "School (University or College)"
+]
+education_features = [
+    "Associate degree", "Bachelor degree", "Master degree", "Primary or elementary school", "Professional degree",
+    "Secondary school", "Some college or university study without earning a degree"
+]
+industry_targets = [
+    "Banking/Financial Services", "Computer Systems Design and Services", "Energy", "Fintech", "Government", "Healthcare", 
+    "Higher Education", "Insurance", "Internet, Telecomm or Information Services", "Manufacturing", 
+    "Media & Advertising Services", "Retail and Consumer Services", "Software Development", "Transportation, or Supply Chain"
+]
+dev_type_targets = [
+    "Academic researcher", "Blockchain", "Cloud infrastructure engineer", "Data engineer", "Data or business analyst", "Student", "System administrator",
+    "Data scientist or machine learning specialist", "Database administrator", "Designer", "DevOps specialist", "Developer Advocate", 
+    "Developer Experience", "Developer, AI", "Developer, QA or test", "Developer, back-end", "Developer, desktop or enterprise applications", 
+    "Developer, embedded applications or devices", "Developer, front-end", "Developer, full-stack", "Developer, game or graphics", 
+    "Developer, mobile", "Educator", "Engineer, site reliability", "Engineering manager", "Hardware Engineer", "Marketing or sales professional", 
+    "Product manager", "Project manager", "Research & Development role", "Scientist", "Security professional", "Senior Executive"
+]
 
-    st.subheader("🔗 Association Analysis")
-    st.markdown(
-        """
-        This analysis identifies the strongest relationships between education levels, industries, and developer roles 
-        using Cramér's V statistic.
-        """
-    )
-    features_pd = association_analysis_data(spark)
-    indus_association = association_analysis(features_pd, education_features, industry_targets)
-    association_plot(indus_association, "Education", "Industry")
-    dev_association = association_analysis(features_pd, education_features, dev_type_targets)
-    association_plot(dev_association, "Education", "DevType")
+st.subheader("🔗 Association Analysis")
+st.markdown(
+    """
+    This analysis identifies the strongest relationships between education levels, industries, and developer roles 
+    using Cramér's V statistic.
+    """
+)
+features_pd = association_analysis_data(spark)
+indus_association = association_analysis(features_pd, education_features, industry_targets)
+association_plot(indus_association, "Education", "Industry")
+dev_association = association_analysis(features_pd, education_features, dev_type_targets)
+association_plot(dev_association, "Education", "DevType")
 
 
-    st.subheader("📊 PCA Visualization of Clusters")
-    st.markdown(
-        """
-        The PCA plot below visualizes clusters of respondents based on their education levels and learning methods.
-        """
-    )
-    clustered = clustering_analysis(features_pd, learn_code_features + education_features)
-    clustered = pca_analysis(clustered)
-    pca_plot(clustered)
+st.subheader("📊 PCA Visualization of Clusters")
+st.markdown(
+    """
+    The PCA plot below visualizes clusters of respondents based on their education levels and learning methods.
+    """
+)
+clustered = clustering_analysis(features_pd, learn_code_features + education_features)
+clustered = pca_analysis(clustered)
+pca_plot(clustered)
 
-    spark.stop()
+spark.stop()
 
 
 # from pyspark.ml.evaluation import ClusteringEvaluator

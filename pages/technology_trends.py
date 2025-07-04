@@ -27,17 +27,10 @@ JDBC_OPTS = {
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JDBC_JAR_PATH = os.path.join(BASE_DIR, "postgresql-42.7.6.jar")
 
-@st.cache_resource
-def get_spark_session():
-    """
-    Cache the Spark session to avoid reinitializing it when switching pages.
-    """
-    return (SparkSession.builder
-            .appName("Technology Trends Analysis")
-            .config("spark.executor.memory", "2g")
-            .config("spark.driver.memory", "2g")
-            .config("spark.jars", JDBC_JAR_PATH)
-            .getOrCreate())
+spark = SparkSession.builder \
+            .appName("technology_trends_analysis") \
+            .config("spark.jars", JDBC_JAR_PATH) \
+            .getOrCreate()
 
 @st.cache_data
 def fetch_data(_spark, table_name, lookup_table):
@@ -115,67 +108,64 @@ def plot(df_pd, feature):
     # Show the plot
     st.plotly_chart(fig, use_container_width=True)
 
-if __name__ == "__main__":
-    # Streamlit configuration
-    st.set_page_config(page_title="Technology Trends", layout="wide")
 
-    # Page Title and Description
-    st.title("Technology Trends in Software Development")
-    st.markdown("""
-    This page explores the popularity and demand for various technologies among developers, 
-    based on survey data. The analysis includes programming languages, databases, cloud platforms, 
-    web frameworks, and more. Each chart shows the number of developers who have worked with a 
-    technology in the past year and those who want to work with it in the next year.
-    """)
+# Streamlit configuration
+st.set_page_config(page_title="Technology Trends", layout="wide")
 
-    # Initialize Spark session
-    spark = get_spark_session()
+# Page Title and Description
+st.title("Technology Trends in Software Development")
+st.markdown("""
+This page explores the popularity and demand for various technologies among developers, 
+based on survey data. The analysis includes programming languages, databases, cloud platforms, 
+web frameworks, and more. Each chart shows the number of developers who have worked with a 
+technology in the past year and those who want to work with it in the next year.
+""")
 
-    # Fetch and Plot Data
-    st.header("Programming Languages")
-    st.markdown("The chart below shows the popularity and demand for programming languages.")
-    pl_df = fetch_data(spark, "RespondentLanguage", "ProgrammingLanguage")
-    plot(pl_df, "Programming Language")
+# Fetch and Plot Data
+st.header("Programming Languages")
+st.markdown("The chart below shows the popularity and demand for programming languages.")
+pl_df = fetch_data(spark, "RespondentLanguage", "ProgrammingLanguage")
+plot(pl_df, "Programming Language")
 
-    st.header("Databases")
-    st.markdown("The chart below shows the popularity and demand for databases.")
-    db_df = fetch_data(spark, "RespondentDatabase", "Database")
-    plot(db_df, "Database")
+st.header("Databases")
+st.markdown("The chart below shows the popularity and demand for databases.")
+db_df = fetch_data(spark, "RespondentDatabase", "Database")
+plot(db_df, "Database")
 
-    st.header("Cloud Platforms")
-    st.markdown("The chart below shows the popularity and demand for cloud platforms.")
-    cloud_df = fetch_data(spark, "RespondentCloud", "Cloud")
-    plot(cloud_df, "Cloud Platform")
+st.header("Cloud Platforms")
+st.markdown("The chart below shows the popularity and demand for cloud platforms.")
+cloud_df = fetch_data(spark, "RespondentCloud", "Cloud")
+plot(cloud_df, "Cloud Platform")
 
-    st.header("Web Frameworks")
-    st.markdown("The chart below shows the popularity and demand for web frameworks and technologies.")
-    web_df = fetch_data(spark, "RespondentWebFramework", "WebFramework")
-    plot(web_df, "Web Framework/Technology")
+st.header("Web Frameworks")
+st.markdown("The chart below shows the popularity and demand for web frameworks and technologies.")
+web_df = fetch_data(spark, "RespondentWebFramework", "WebFramework")
+plot(web_df, "Web Framework/Technology")
 
-    st.header("Embedded Systems")
-    st.markdown("The chart below shows the popularity and demand for embedded systems and technologies.")
-    embed_df = fetch_data(spark, "RespondentEmbeddedSystem", "EmbeddedSystem")
-    plot(embed_df, "Embedded Systems/Technologies")
+st.header("Embedded Systems")
+st.markdown("The chart below shows the popularity and demand for embedded systems and technologies.")
+embed_df = fetch_data(spark, "RespondentEmbeddedSystem", "EmbeddedSystem")
+plot(embed_df, "Embedded Systems/Technologies")
 
-    st.header("Miscellaneous Technologies")
-    st.markdown("The chart below shows the popularity and demand for other frameworks and technologies.")
-    misc_df = fetch_data(spark, "RespondentMiscTech", "MiscTech")
-    plot(misc_df, "Other Frameworks/Technologies")
+st.header("Miscellaneous Technologies")
+st.markdown("The chart below shows the popularity and demand for other frameworks and technologies.")
+misc_df = fetch_data(spark, "RespondentMiscTech", "MiscTech")
+plot(misc_df, "Other Frameworks/Technologies")
 
-    st.header("Developer Tools")
-    st.markdown("The chart below shows the popularity and demand for developer tools used for compiling, building, and testing.")
-    dev_df = fetch_data(spark, "RespondentDevTool", "DevTool")
-    plot(dev_df, "Developer Tools for Compiling, Building and Testing")
+st.header("Developer Tools")
+st.markdown("The chart below shows the popularity and demand for developer tools used for compiling, building, and testing.")
+dev_df = fetch_data(spark, "RespondentDevTool", "DevTool")
+plot(dev_df, "Developer Tools for Compiling, Building and Testing")
 
-    st.header("Integrated Development Environments (IDEs)")
-    st.markdown("The chart below shows the popularity and demand for IDEs.")
-    ide_df = fetch_data(spark, "RespondentIDE", "IDE")
-    plot(ide_df, "Integrated Development Environment")
+st.header("Integrated Development Environments (IDEs)")
+st.markdown("The chart below shows the popularity and demand for IDEs.")
+ide_df = fetch_data(spark, "RespondentIDE", "IDE")
+plot(ide_df, "Integrated Development Environment")
 
-    st.header("AI-Powered Tools")
-    st.markdown("The chart below shows the popularity and demand for AI-powered search and developer tools.")
-    ai_tool_df = fetch_data(spark, "RespondentAITool", "AITool")
-    plot(ai_tool_df, "AI-powered search and developer tools")
+st.header("AI-Powered Tools")
+st.markdown("The chart below shows the popularity and demand for AI-powered search and developer tools.")
+ai_tool_df = fetch_data(spark, "RespondentAITool", "AITool")
+plot(ai_tool_df, "AI-powered search and developer tools")
 
-    # Stop Spark session
-    spark.stop()
+# Stop Spark session
+spark.stop()
