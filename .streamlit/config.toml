@@ -1,0 +1,13 @@
+# .streamlit/config.toml
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
+
+[global]
+# Optional: disable telemetry
+# telemetryEnabled = false
+
+[environment]
+JAVA_HOME = "/usr/local/openjdk-11"
